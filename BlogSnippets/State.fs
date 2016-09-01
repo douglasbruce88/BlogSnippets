@@ -60,15 +60,23 @@ module State =
     printf "%d %s" (forSum list) System.Environment.NewLine
     printf "%d %s" (whileSum list) System.Environment.NewLine
     printf "%d %s" (recSum list) System.Environment.NewLine
+
+    let sumListAndUpdateState list state = 
+        (recSum list, state)
     
     // Using an explicit state type
+    let returnS a = (fun s -> a, s)
+    
     let (>>=) x f = 
         (fun s0 -> 
         let a, s = x s0
         f a s)
-    
-    let returnS a = (fun s -> a, s)
-    
+
+    let (>=>) m1 m2 = 
+        (fun s0 ->
+        let _, s = m1 s0
+        m2 s)
+      
     type StateBuilder() = 
         member m.Bind(x, f) = x >>= f
         member m.Return a = returnS a
@@ -78,8 +86,7 @@ module State =
     let getState = (fun s -> s, s)
     let setState s = (fun _ -> (), s)
     let Execute m s = m s |> snd
-    let test s = s
-    
+
     let stateSum list = 
         let rec aux t = 
             state { 
@@ -94,3 +101,29 @@ module State =
         Execute (aux list) 0
     
     printf "%d %s" (stateSum list) System.Environment.NewLine
+    
+    // Global state
+    let mutable globalCounter = 0
+    
+    let canOnlyRunFiveTimes passAction failAction = 
+        match globalCounter < 5 with
+        | true ->            
+            passAction globalCounter
+            globalCounter <- globalCounter + 1
+        | false -> 
+            failAction globalCounter
+            globalCounter <- -1
+    
+    let monadicCounter = 0
+    
+    let canOnlyRunFiveTimesWithStateMonad passAction failAction = 
+            state { 
+                let! s = getState
+                match s < 5 with
+                | true -> 
+                    passAction s
+                    do! setState (s + 1)
+                | false -> 
+                   failAction s
+                   do! setState (- 1)
+            }

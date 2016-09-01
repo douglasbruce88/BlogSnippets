@@ -60,23 +60,24 @@ module State =
     printf "%d %s" (forSum list) System.Environment.NewLine
     printf "%d %s" (whileSum list) System.Environment.NewLine
     printf "%d %s" (recSum list) System.Environment.NewLine
-
-    let sumListAndUpdateState list state = 
-        (recSum list, state)
+    
+    let sumListAndUpdateState list state = (recSum list, state)
     
     // Using an explicit state type
+    type StateMonad<'a, 'b> = 'a -> ('a * 'b)
+    
     let returnS a = (fun s -> a, s)
     
     let (>>=) x f = 
         (fun s0 -> 
         let a, s = x s0
         f a s)
-
+    
     let (>=>) m1 m2 = 
-        (fun s0 ->
+        (fun s0 -> 
         let _, s = m1 s0
         m2 s)
-      
+    
     type StateBuilder() = 
         member m.Bind(x, f) = x >>= f
         member m.Return a = returnS a
@@ -86,7 +87,7 @@ module State =
     let getState = (fun s -> s, s)
     let setState s = (fun _ -> (), s)
     let Execute m s = m s |> snd
-
+    
     let stateSum list = 
         let rec aux t = 
             state { 
@@ -95,11 +96,23 @@ module State =
                     let! s = getState
                     do! setState (s + head)
                     return! aux tail
-                | [] -> let! s = getState
-                        return ([], s)
+                | [] -> return ()
             }
         Execute (aux list) 0
     
+    let fold aggregator initialValue list = 
+        let rec aux t = 
+            state { 
+                match t with
+                | head :: tail -> 
+                    let! s = getState
+                    do! setState (aggregator s head)
+                    return! aux tail
+                | [] -> return ()
+            }
+        Execute (aux list) initialValue
+    
+    printf "%d %s" (fold (+) 0 list) System.Environment.NewLine
     printf "%d %s" (stateSum list) System.Environment.NewLine
     
     // Global state
@@ -107,7 +120,7 @@ module State =
     
     let canOnlyRunFiveTimes passAction failAction = 
         match globalCounter < 5 with
-        | true ->            
+        | true -> 
             passAction globalCounter
             globalCounter <- globalCounter + 1
         | false -> 
@@ -117,13 +130,13 @@ module State =
     let monadicCounter = 0
     
     let canOnlyRunFiveTimesWithStateMonad passAction failAction = 
-            state { 
-                let! s = getState
-                match s < 5 with
-                | true -> 
-                    passAction s
-                    do! setState (s + 1)
-                | false -> 
-                   failAction s
-                   do! setState (- 1)
-            }
+        state { 
+            let! s = getState
+            match s < 5 with
+            | true -> 
+                passAction s
+                do! setState (s + 1)
+            | false -> 
+                failAction s
+                do! setState (-1)
+        }

@@ -23,6 +23,13 @@ module StateTests =
       actual =! expected    
       
     [<Test>]
+    let ``Generic aggregation``() = 
+      let list = [ 1..10 ]
+      let actual = fold (+) 0 list
+      let expected = List.sum list
+      actual =! expected    
+
+    [<Test>]
     let ``Global mutable state``() = 
       for _ in 1 .. 5 do canOnlyRunFiveTimes (printf "Run %d \r\n") (printf "Not run %d \r\n")
       globalCounter =! 5
